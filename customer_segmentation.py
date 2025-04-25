@@ -34,7 +34,7 @@ X = data[features]
 
 # Clustering
 st.subheader("🧠 K-Means Clustering")
-k = st.slider("Select number of clusters (k)", 2, 10, 5)
+k = st.slider("Select number of clusters (k)", 2, 5, 5)
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
