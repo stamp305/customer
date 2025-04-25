@@ -1,73 +1,83 @@
-# -*- coding: utf-8 -*-
-
-
-import os
-os.environ["OMP_NUM_THREADS"] = "1"
 
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import StandardScaler
-from sklearn.datasets import load_iris
+from sklearn.metrics import classification_report, accuracy_score
 
-# Page title
-st.title("🔍 K-Means Clustering App")
-st.write("เลือก Dataset ด้านล่างเพื่อลองทำ Clustering และดูผลการกระจายกลุ่ม")
+# Title
+st.title("📊 Customer Segmentation & Prediction App")
 
-# Dataset selection
-dataset_option = st.sidebar.selectbox("📂 เลือก Dataset", ["Iris Dataset", "Mall Customer Dataset"])
+# Load Data
+data = pd.read_csv("Mall_Customers (2).csv")
 
-if dataset_option == "Iris Dataset":
-    iris = load_iris()
-    X = pd.DataFrame(iris.data, columns=iris.feature_names)
-    dataset_name = "Iris Dataset"
-    
-elif dataset_option == "Mall Customer Dataset":
-    try:
-        df = pd.read_csv("Mall_Customers (2).csv")
-    except:
-        st.error("ไม่พบไฟล์ 'Mall_Customers (2).csv' กรุณาอัปโหลดหรือวางในโฟลเดอร์เดียวกับสคริปต์นี้")
-        st.stop()
-    
-    dataset_name = "Mall Customer Dataset"
-    X = df[["Annual Income (k$)", "Spending Score (1-100)"]]
+st.subheader("🧾 Raw Dataset")
+st.dataframe(data.head())
 
-# Cluster number selection
-k = st.sidebar.slider("เลือกจำนวนกลุ่ม (k)", min_value=2, max_value=10, value=5)
+# Encode Gender
+le = LabelEncoder()
+data['Gender'] = le.fit_transform(data['Gender'])
 
-# Standardize data
+# Feature Selection
+features = ['Gender', 'Age', 'Annual Income (k$)', 'Spending Score (1-100)']
+X = data[features]
+
+# Clustering
+st.subheader("🧠 K-Means Clustering")
+k = 5  # Fixed number of clusters
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# KMeans modeling
 kmeans = KMeans(n_clusters=k, random_state=42)
 labels = kmeans.fit_predict(X_scaled)
-centroids = kmeans.cluster_centers_
 
-# PCA for visualization
+# PCA for 2D Visualization
 pca = PCA(n_components=2)
-X_pca = pca.fit_transform(X_scaled)
-centroids_pca = pca.transform(centroids)
+reduced = pca.fit_transform(X_scaled)
+reduced_df = pd.DataFrame(reduced, columns=["PCA1", "PCA2"])
+reduced_df["Cluster"] = labels
+centroids = pca.transform(kmeans.cluster_centers_)
 
-# Plot
-fig, ax = plt.subplots(figsize=(8, 6))
-scatter = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='Set1', s=50)
-ax.scatter(centroids_pca[:, 0], centroids_pca[:, 1], c='red', s=200, marker='o', label='Centroids')
-ax.set_title(f"{dataset_name} - K={k} Clusters")
-ax.set_xlabel("PCA1")
-ax.set_ylabel("PCA2")
-ax.legend()
-st.pyplot(fig)
+fig1, ax1 = plt.subplots()
+for cluster in range(k):
+    cluster_data = reduced_df[reduced_df["Cluster"] == cluster]
+    ax1.scatter(cluster_data["PCA1"], cluster_data["PCA2"], label=f"Cluster {cluster}")
+ax1.scatter(centroids[:, 0], centroids[:, 1], c='red', s=200, marker='o', label='Centroids')
+ax1.set_title("Clusters (2D PCA Projection)")
+ax1.legend()
+st.pyplot(fig1)
 
-# Display data
-st.write("### 🧾 Clustered Data (แสดงเพียง 10 แถว)")
-if dataset_option == "Iris Dataset":
-    st.dataframe(X.assign(Cluster=labels).head(10))
-else:
-    st.dataframe(df.assign(Cluster=labels).head(10))
+# Classification
+st.subheader("🔍 Classification with Random Forest")
+data['High Spender'] = data['Spending Score (1-100)'].apply(lambda x: 1 if x > 50 else 0)
+X_cls = X.drop('Spending Score (1-100)', axis=1)
+y_cls = data['High Spender']
 
-# Show Centroids
-st.write("### 📌 Cluster Centers (scaled, PCA-reduced)")
-st.dataframe(pd.DataFrame(centroids_pca, columns=["PCA1", "PCA2"]))
+X_train, X_test, y_train, y_test = train_test_split(X_cls, y_cls, test_size=0.2, random_state=42)
+clf = RandomForestClassifier(random_state=42)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+
+acc = accuracy_score(y_test, y_pred)
+st.write(f"✅ Accuracy: {acc:.2f}")
+st.text("Classification Report:")
+st.text(classification_report(y_test, y_pred))
+
+# User prediction
+st.subheader("🎯 Predict Spending Class")
+gender = st.selectbox("Gender", ['Male', 'Female'])
+age = st.slider("Age", 15, 70, 30)
+income = st.slider("Annual Income (k$)", 10, 150, 50)
+
+user_input = pd.DataFrame({
+    "Gender": [1 if gender == "Male" else 0],
+    "Age": [age],
+    "Annual Income (k$)": [income]
+})
+
+user_pred = clf.predict(user_input)
+st.write("🧠 Prediction: ", "High Spender" if user_pred[0] == 1 else "Low Spender")
