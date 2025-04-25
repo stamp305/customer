@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+Created on April 25, 2025
+Project: Customer Segmentation & Prediction App
+@author: YourName
+"""
 
 import streamlit as st
 import pandas as pd
@@ -28,7 +34,7 @@ X = data[features]
 
 # Clustering
 st.subheader("🧠 K-Means Clustering")
-k = 5  # Fixed number of clusters
+k = 5  # fixed number of clusters
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
@@ -40,13 +46,14 @@ pca = PCA(n_components=2)
 reduced = pca.fit_transform(X_scaled)
 reduced_df = pd.DataFrame(reduced, columns=["PCA1", "PCA2"])
 reduced_df["Cluster"] = labels
-centroids = pca.transform(kmeans.cluster_centers_)
 
 fig1, ax1 = plt.subplots()
 for cluster in range(k):
     cluster_data = reduced_df[reduced_df["Cluster"] == cluster]
     ax1.scatter(cluster_data["PCA1"], cluster_data["PCA2"], label=f"Cluster {cluster}")
-ax1.scatter(centroids[:, 0], centroids[:, 1], c='red', s=200, marker='o', label='Centroids')
+# Plot centroids in red
+centroids_2d = pca.transform(kmeans.cluster_centers_)
+ax1.scatter(centroids_2d[:, 0], centroids_2d[:, 1], c='red', s=200, marker='o', label='Centroids')
 ax1.set_title("Clusters (2D PCA Projection)")
 ax1.legend()
 st.pyplot(fig1)
@@ -62,6 +69,7 @@ clf = RandomForestClassifier(random_state=42)
 clf.fit(X_train, y_train)
 y_pred = clf.predict(X_test)
 
+# Metrics
 acc = accuracy_score(y_test, y_pred)
 st.write(f"✅ Accuracy: {acc:.2f}")
 st.text("Classification Report:")
@@ -73,6 +81,7 @@ gender = st.selectbox("Gender", ['Male', 'Female'])
 age = st.slider("Age", 15, 70, 30)
 income = st.slider("Annual Income (k$)", 10, 150, 50)
 
+# Predict user input
 user_input = pd.DataFrame({
     "Gender": [1 if gender == "Male" else 0],
     "Age": [age],
